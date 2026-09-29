@@ -16,6 +16,6 @@ resource "cloudflare_dns_record" "le-cert" {
   zone_id = var.cloudflare_zone_id
   name    = yandex_cm_certificate.le-certificate.challenges[count.index].dns_name
   type    = yandex_cm_certificate.le-certificate.challenges[count.index].dns_type
-  data    = [yandex_cm_certificate.le-certificate.challenges[count.index].dns_value]
+  content = yandex_cm_certificate.le-certificate.challenges[count.index].dns_value
   ttl     = 60
 }
