@@ -1,0 +1,15 @@
+apiVersion: v2
+name: podinfo-networkpolicy
+description: Podinfo Helm chart wrapper for NetworkPolicy lesson
+type: application
+version: 0.1.0
+appVersion: 6.9.3
+
+dependencies:
+  - name: podinfo
+    version: 6.9.3
+    repository: file://../../../../helm-charts/podinfo
+  - name: netshoot
+    version: 0.1.0
+    repository: file://../../../../helm-charts/netshoot
+

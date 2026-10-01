@@ -1,0 +1,49 @@
+# Values for podinfo helm chart in NetworkPolicy lesson
+# This configuration is optimized for demonstrating NetworkPolicy functionality
+
+podinfo:
+  # Namespace override - podinfo will be installed in demo namespace
+  namespaceOverride: demo
+  
+  # Set deployment and service name to "podinfo" (without release name)
+  fullnameOverride: podinfo
+  
+  replicaCount: 2
+  logLevel: info
+
+  ui:
+    color: "#34577c"
+    message: "NetworkPolicy Lesson"
+
+  # Disable fault injection for stable testing
+  faults:
+    delay: false
+    error: false
+    unhealthy: false
+    unready: false
+    testFail: false
+    testTimeout: false
+
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+netshoot:
+  # Namespace override - netshoot will be installed in frontend namespace
+  namespaceOverride: frontend
+  
+  # Set pod name
+  fullnameOverride: netshoot
+  
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi

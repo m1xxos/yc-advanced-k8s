@@ -1,0 +1,22 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-frontend-podinfo
+  namespace: demo
+spec:
+  # Select all pods with label app.kubernetes.io/name: podinfo
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: podinfo
+  ingress:
+    # Allow traffic only from pods in the frontend namespace
+    - fromEndpoints:
+      - matchLabels:
+          k8s:io.kubernetes.pod.namespace: frontend
+      toPorts:
+      - ports:
+        - port: "9898"  # HTTP port
+          protocol: TCP
+        - port: "9999"  # gRPC port
+          protocol: TCP
+  # No egress rules - allow all outgoing traffic by default (only for this policy)
