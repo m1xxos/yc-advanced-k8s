@@ -39,3 +39,4 @@ terraform.rc
 *.env.local
 helm-charts/
 modules/
+*.tgz

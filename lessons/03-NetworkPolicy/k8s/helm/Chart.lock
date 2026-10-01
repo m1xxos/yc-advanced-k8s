@@ -1,0 +1,9 @@
+dependencies:
+- name: podinfo
+  repository: file://../../../../helm-charts/podinfo
+  version: 6.9.3
+- name: netshoot
+  repository: file://../../../../helm-charts/netshoot
+  version: 0.1.0
+digest: sha256:4c7a622cdf1e7e8d4ada0660129571b44495856230421f722a4b2550df4dd798
+generated: "2026-10-01T17:01:07.751792+03:00"
