@@ -1,0 +1,23 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: restricted-dns-netshoot
+  namespace: demo
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: netshoot
+  egress:
+    - toFQDNs:
+      - matchPattern: "2ip.ru"
+    - toEndpoints:
+      - matchLabels:
+          "k8s-app": kube-dns
+          "k8s:io.kubernetes.pod.namespace": kube-system
+      toPorts:
+      - ports:
+        - port: "53"
+          protocol: ANY
+        rules:
+          dns:
+          - matchPattern: "2ip.ru"

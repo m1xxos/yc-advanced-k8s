@@ -1,0 +1,37 @@
+
+# Set pod name
+fullnameOverride: k6
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 300m
+    memory: 128Mi
+
+k6:
+  configMap:
+    create: true
+    # Content of the k6 test script (used when create=true)
+    content: |
+      import http from 'k6/http';
+      import { sleep, check } from 'k6';
+
+      export const options = {
+        vus: 1,
+        duration: '5m',
+        noConnectionReuse: true,
+        noVUConnectionReuse: true,
+        dns: {
+          ttl: '0',
+          select: 'random',
+          policy: 'any',
+        },
+      };
+
+      export default function() {
+        let res = http.get(`http://${__ENV.HOSTNAME}:9898`);
+        check(res, { "status is 200": (res) => res.status === 200 });
+      }
+    # Mount path for the script (default: /scripts)
+    mountPath: /scripts

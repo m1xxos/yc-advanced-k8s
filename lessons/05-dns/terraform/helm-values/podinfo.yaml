@@ -1,0 +1,34 @@
+# Имя deployment и service без префикса release name
+fullnameOverride: podinfo
+
+# Количество реплик
+replicaCount: 1
+
+# Уровень логирования
+logLevel: info
+
+# Настройки UI
+ui:
+  color: "#34577c"
+  message: "Lesson: DNS"
+
+# Disable fault injection for stable testing
+faults:
+  delay: false
+  error: false
+  unhealthy: false
+  unready: false
+  testFail: false
+  testTimeout: false
+
+# Лимиты и запросы ресурсов
+resources:
+  limits:
+    # cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+# Не создаем HTTPRoute ресурсы
+httpRoutes: []
