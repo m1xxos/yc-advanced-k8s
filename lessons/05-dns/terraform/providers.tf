@@ -8,3 +8,7 @@ provider "helm" {
     token                  = data.yandex_client_config.client.iam_token
   }
 }
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
