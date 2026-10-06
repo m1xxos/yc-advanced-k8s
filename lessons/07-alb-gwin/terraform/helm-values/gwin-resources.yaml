@@ -1,0 +1,209 @@
+# Конфигурация YCCertificate - Custom Resource для ссылки на сертификаты из Yandex Cloud Certificate Manager
+# Документация: https://yandex.cloud/ru/docs/managed-kubernetes/gwin-ref/gateway
+ycCertificate:
+  # Включить создание ресурса YCCertificate
+  enabled: true
+  # Имя ресурса YCCertificate в Kubernetes
+  name: yc-certificate-${dns_zone_name}
+  # ID сертификата из Yandex Cloud Certificate Manager
+  certificateID: ${certificate_id}
+
+# Конфигурация Gateway - ресурс Kubernetes Gateway API для настройки Application Load Balancer
+# Документация: https://yandex.cloud/ru/docs/managed-kubernetes/gwin-ref/gateway
+gateway:
+  # Включить создание ресурса Gateway
+  enabled: true
+  # Имя ресурса Gateway в Kubernetes
+  name: ${gwin_gateway_name}
+  # Аннотации Gateway (используются только для настроек, которые нельзя перенести в GatewayPolicy)
+  # Рекомендуется использовать GatewayPolicy вместо аннотаций, где это возможно
+  annotations: {}
+  # Имя класса Gateway, определяющего реализацию контроллера (gwin-default для Yandex Cloud gwin)
+  gatewayClassName: gwin-default
+  # Список слушателей (listeners) Gateway - определяют порты, протоколы и правила маршрутизации
+  listeners:
+    # Имя слушателя (должно быть уникальным в рамках Gateway)
+    - name: http
+      # Имя хоста (hostname) для маршрутизации трафика
+      # Поддерживается wildcard (*) для поддоменов, например "*.example.com"
+      hostname: "*.${dns_zone}"
+      # Порт, на котором слушатель принимает трафик (80 для HTTP)
+      port: 80
+      # Протокол слушателя: HTTP, HTTPS, TCP, TLS, UDP
+      # Используем HTTP для редиректа на HTTPS
+      protocol: HTTP
+      # Настройки разрешенных маршрутов (HTTPRoute), которые могут быть привязаны к этому слушателю
+      allowedRoutes:
+        # Настройки выбора namespace'ов для HTTPRoute
+        namespaces:
+          # Способ выбора namespace'ов: "All", "Selector", "Same"
+          # "Selector" - выбор по меткам (labels)
+          from: Selector
+          # Селектор для выбора namespace'ов по меткам
+          selector:
+            matchLabels:
+              # Динамическая генерация всех labels из podinfo_namespace_labels для привязки HTTPRoute
+              %{~ for key, value in podinfo_namespace_labels ~}
+              ${key}: ${value}
+              %{~ endfor ~}
+      # TLS не используется для HTTP listener
+      # Для редиректа с HTTP на HTTPS создайте HTTPRoute с фильтром redirect:
+      # filters:
+      #   - type: RequestRedirect
+      #     requestRedirect:
+      #       scheme: https
+      #       statusCode: 301
+    # Имя слушателя (должно быть уникальным в рамках Gateway)
+    - name: https
+      # Имя хоста (hostname) для маршрутизации трафика
+      # Поддерживается wildcard (*) для поддоменов, например "*.example.com"
+      hostname: "*.${dns_zone}"
+      # Порт, на котором слушатель принимает трафик (443 для HTTPS)
+      port: 443
+      # Протокол слушателя: HTTP, HTTPS, TCP, TLS, UDP
+      # Используем HTTPS, так как настроен TLS
+      protocol: HTTPS
+      # Настройки разрешенных маршрутов (HTTPRoute), которые могут быть привязаны к этому слушателю
+      allowedRoutes:
+        # Настройки выбора namespace'ов для HTTPRoute
+        namespaces:
+          # Способ выбора namespace'ов: "All", "Selector", "Same"
+          # "Selector" - выбор по меткам (labels)
+          from: Selector
+          # Селектор для выбора namespace'ов по меткам
+          selector:
+            matchLabels:
+              # Динамическая генерация всех labels из podinfo_namespace_labels для привязки HTTPRoute
+              %{~ for key, value in podinfo_namespace_labels ~}
+              ${key}: ${value}
+              %{~ endfor ~}
+      # Настройки TLS для слушателя
+      tls:
+        # Режим TLS: "Terminate" (терминация на Gateway) или "Passthrough" (проброс к backend)
+        mode: Terminate
+        # Ссылки на сертификаты для TLS
+        certificateRefs:
+          # API группа ресурса сертификата
+          - group: gwin.yandex.cloud
+            # Тип ресурса сертификата (YCCertificate для Yandex Cloud)
+            kind: YCCertificate
+            # Имя ресурса YCCertificate
+            name: yc-certificate-${dns_zone_name}
+            # Namespace, в котором находится YCCertificate (gwin-system)
+            namespace: ${gwin_controller_namespace_name}
+  # Список адресов Gateway - определяют, какие IP-адреса будут назначены балансировщику
+  # Документация: https://yandex.cloud/ru/docs/managed-kubernetes/gwin-ref/gateway#gatewayaddress
+  # ВАЖНО: Yandex Cloud ALB не позволяет указывать оба типа IPv4 адресов одновременно
+  # Можно указать только один из: IPAddress (статический), autoIPv4 (автоматический публичный) или internalIPv4 (внутренний)
+  addresses:
+    # Тип адреса: IPAddress - использование статического публичного IPv4 адреса
+    #   так как в коде terraform описано автоматическое создание доменного имени для HTTPRoute podinfo
+    - type: IPAddress
+      # Значение адреса: статический IP адрес из yandex_vpc_address
+      value: ${gateway_ip_address}
+    # Альтернативные варианты:
+    # Для автоматического назначения публичного IP:
+    # - type: gwin.yandex.cloud/autoIPv4
+    #   value: auto
+    # Для внутреннего доступа можно использовать internalIPv4:
+    # - type: gwin.yandex.cloud/internalIPv4
+    #   value: "<internal_subnet_id>/auto"
+
+# Конфигурация GatewayPolicy - политика для настройки параметров Gateway
+# Используется вместо аннотаций для структурированной настройки параметров балансировщика
+# Документация: https://yandex.cloud/ru/docs/managed-kubernetes/gwin-ref/gatewaypolicy#gateway
+gatewayPolicy:
+  # Включить создание ресурса GatewayPolicy
+  enabled: true
+  # Имя ресурса GatewayPolicy в Kubernetes
+  name: gwin-gateway-policy
+
+  # Разрешить автоматическое переключение трафика между зонами доступности при недоступности одной из зон
+  allowZonalShift: true
+
+  # Список подсетей для размещения балансировщика (опционально)
+  # Если не указано, используются подсети из конфигурации кластера
+  # subnets: [ ]
+
+  # Список групп безопасности для балансировщика (опционально)
+  # securityGroups: []
+
+  # Настройки логирования балансировщика
+  logs:
+    # ID лог-группы Yandex Cloud Logging для записи логов балансировщика
+    # Если не указано, используется лог-группа по умолчанию
+    logGroupID: ${log_group_id}
+    # Отключить логирование (false - логирование включено)
+    disable: false
+    # Правила отбрасывания логов для уменьшения объема записываемых логов
+    # Ключ - имя правила (динамическое), значение - параметры правила
+    discardRule:
+      no-noise:
+        # HTTP коды ответов для отбрасывания (например, 404, 500)
+        httpCodes:
+          - 404
+          - 500
+        # Интервалы HTTP кодов для отбрасывания: HTTP_2XX, HTTP_3XX, HTTP_4XX, HTTP_5XX
+        httpCodeIntervals:
+          - HTTP_4XX
+          - HTTP_5XX
+        # gRPC коды для отбрасывания (например, INTERNAL, UNIMPLEMENTED)
+        grpcCodes:
+          - INTERNAL
+          - UNIMPLEMENTED
+        # Процент логов для отбрасывания (0-100)
+        discardPercent: 10
+
+  # Настройки автомасштабирования балансировщика
+  autoScale:
+    # Минимальное количество единиц балансировщика в каждой зоне доступности
+    # Минимальное значение: 2 (согласно документации Yandex Cloud)
+    minZoneSize: 2
+    # Максимальное общее количество единиц балансировщика
+    maxSize: 6
+
+  # Управление трафиком по зонам доступности
+  # Ключ - имя зоны (динамическое, например "ru-central1-a"), значение - настройки зоны
+  # ВАЖНО: Рекомендуется включить зоны, где находятся ноды кластера, для оптимальной маршрутизации
+  # трафика и снижения задержек. Целевая группа формируется автоматически на основе подов,
+  # но если ALB не принимает трафик в зоне с нодами, маршрутизация может быть неоптимальной.
+  zone:
+    ru-central1-a:
+      # Разрешить прием трафика в этой зоне (true - зона активна, false - зона отключена)
+      receiveTraffic: true
+    ru-central1-b:
+      receiveTraffic: true
+    ru-central1-d:
+      receiveTraffic: true
+
+  # Настройки для всех слушателей Gateway (применяются ко всем listeners)
+  # listeners:
+  #   # Настройки HTTP протокола для всех слушателей
+  #   http:
+  #     protocolSettings:
+  #       # Разрешить использование HTTP/1.0
+  #       allowHTTP10: true
+  #       # Настройки HTTP/2
+  #       http2Options:
+  #         # Максимальное количество одновременных потоков HTTP/2
+  #         maxConcurrentStreams: 100
+  #   # Настройки RBAC (Role-Based Access Control) для всех слушателей
+  #   rbac:
+  #     # Действие: "ALLOW" (разрешить) или "DENY" (запретить)
+  #     action: ALLOW
+  #     # Принципалы (пользователи/сервисы) для применения политики
+  #     principals: {}
+  # Настройки для конкретных слушателей (применяются к указанному listener по имени)
+  # Ключ - имя слушателя (динамическое, например "http"), значение - настройки слушателя
+  # listener:
+  #   http:
+  #     # Настройки HTTP протокола для слушателя "http"
+  #     http:
+  #       protocolSettings:
+  #         allowHTTP10: true
+  #   stream-listener:
+  #     # Настройки потокового протокола (TCP/UDP) для слушателя "stream-listener"
+  #     stream:
+  #       # Таймаут простоя соединения
+  #       idleTimeout: 300s
+

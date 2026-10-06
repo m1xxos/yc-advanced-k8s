@@ -1,0 +1,44 @@
+# Конфигурация для чарта podinfo
+# Имя deployment и service без префикса release name
+# fullnameOverride: podinfo-v2
+
+# Namespace задается через параметр --namespace при helm install/upgrade
+# namespaceOverride не используется
+
+# Количество реплик
+replicaCount: 2
+
+# Уровень логирования
+logLevel: debug
+
+# Настройки UI
+ui:
+  color: "#2ecc71"
+  message: "Lesson 7: ALB Gwin v2"
+
+# Отключить fault injection для стабильного тестирования
+faults:
+  delay: false
+  error: false
+  unhealthy: false
+  unready: false
+  testFail: false
+  testTimeout: false
+
+# Лимиты и запросы ресурсов
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+# Конфигурация Service
+service:
+  # Тип сервиса: NodePort для работы с gwin через node IP адреса
+  type: NodePort
+  nodePort: 31200
+
+# Не создаем HTTPRoute ресурсы
+httpRoutes: []

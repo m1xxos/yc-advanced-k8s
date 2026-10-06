@@ -1,0 +1,113 @@
+# Конфигурация для чарта podinfo-rollout с Blue-Green strategy, Стабильная версия
+# Имя rollout и service без префикса release name
+# fullnameOverride: podinfo
+
+# Namespace задается через параметр --namespace при helm install/upgrade
+# namespaceOverride не используется
+
+# Количество реплик
+replicaCount: 2
+
+# Уровень логирования
+logLevel: debug
+
+# Настройки UI
+ui:
+  color: "#34577c"
+  message: "Lesson 7: ALB Gwin with Rollout Blue-Green Stable Version"
+
+# Отключить fault injection для стабильного тестирования
+faults:
+  delay: false
+  error: false
+  unhealthy: false
+  unready: false
+  testFail: false
+  testTimeout: false
+
+# Лимиты и запросы ресурсов
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+# Конфигурация Service
+# Для Rollout сервисы создаются автоматически (active и preview)
+service:
+  type: NodePort
+
+# Конфигурация Argo Rollouts с Blue-Green strategy
+rollout:
+  strategy:
+    blueGreen:
+      # Имя сервиса для активной (production) версии
+      # Этот сервис создается Helm чартом (service-bluegreen-active.yaml) и будет указывать на активные поды
+      # Argo Rollouts автоматически управляет селектором этого сервиса, переключая его между версиями
+      # HTTPRoute указывает на этот сервис, поэтому он получает весь трафик (100%)
+      activeService: podinfo-active
+      # Имя сервиса для preview версии
+      # Этот сервис создается Helm чартом (service-bluegreen-preview.yaml) и будет указывать на preview поды
+      # Argo Rollouts автоматически управляет селектором этого сервиса
+      # Preview сервис используется для тестирования новой версии перед продвижением
+      # Он не получает трафик через HTTPRoute, доступ к нему возможен напрямую через Service
+      previewService: podinfo-preview
+      # Автоматическое продвижение preview в active после указанного времени
+      # Если false, требуется ручное продвижение через kubectl argo rollouts promote
+      autoPromotionEnabled: false
+      # Время в секундах до автоматического продвижения (если autoPromotionEnabled: true)
+      autoPromotionSeconds: 30
+      # Задержка перед масштабированием preview до нуля после продвижения
+      # Это позволяет быстро откатиться, если возникнут проблемы после продвижения
+      scaleDownDelaySeconds: 30
+      # Прервать масштабирование preview до нуля, если произошло откат
+      # Если произошел откат во время scaleDownDelaySeconds, preview версия не будет масштабирована до нуля
+      abortScaleDownDelaySeconds: 30
+
+# Конфигурация HTTPRoute для Gateway API
+# Список HTTPRoute ресурсов
+httpRoutes:
+  # HTTPRoute для редиректа с HTTP на HTTPS
+  - name: podinfo-redirect
+    parentRefs:
+      - name: gwin-gateway
+        namespace: gwin-system
+        sectionName: http
+    hostnames:
+      - podinfo.YOUR_DNS_ZONE
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+              statusCode: 301
+
+  # HTTPRoute для основного HTTPS трафика
+  - name: podinfo-https
+    parentRefs:
+      - name: gwin-gateway
+        namespace: gwin-system
+        sectionName: https
+    hostnames:
+      - podinfo.YOUR_DNS_ZONE
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        # Backend references - указываем на active сервис
+        # Во время Blue-Green развертывания Rollout автоматически переключает
+        # селектор active сервиса между старой и новой версией при продвижении
+        # Preview сервис не указан здесь, так как он используется только для тестирования
+        # и не получает трафик через HTTPRoute
+        backendRefs:
+          - name: podinfo-active
+            namespace: demo
+            port: 9898
+            weight: 100

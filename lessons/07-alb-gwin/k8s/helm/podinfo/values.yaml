@@ -1,0 +1,96 @@
+# Конфигурация для чарта podinfo
+# Имя deployment и service без префикса release name
+# fullnameOverride: podinfo
+
+# Namespace задается через параметр --namespace при helm install/upgrade
+# namespaceOverride не используется
+
+# Количество реплик
+replicaCount: 2
+
+# Уровень логирования
+logLevel: debug
+
+# Настройки UI
+ui:
+  color: "#34577c"
+  message: "Lesson 7: ALB Gwin"
+
+# Отключить fault injection для стабильного тестирования
+faults:
+  delay: false
+  error: false
+  unhealthy: false
+  unready: false
+  testFail: false
+  testTimeout: false
+
+# Лимиты и запросы ресурсов
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+# Конфигурация Service
+service:
+  # Тип сервиса: NodePort для работы с gwin через node IP адреса
+  type: NodePort
+
+# Конфигурация HTTPRoute для Gateway API
+# Список HTTPRoute ресурсов
+# Создаем отдельные HTTPRoute для редиректа и основного трафика
+httpRoutes:
+  # HTTPRoute для редиректа с HTTP на HTTPS
+  - name: podinfo-redirect
+    # Привязка к HTTP listener Gateway
+    parentRefs:
+      - name: gwin-gateway
+        namespace: gwin-system
+        sectionName: http
+    # Hostnames для маршрутизации трафика
+    # Значение передается через helm --set при деплое
+    # Пример: --set httpRoutes[0].hostnames[0]=podinfo.example.com
+    hostnames:
+      - podinfo.YOUR_DNS_ZONE
+    # Правило с фильтром редиректа
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        # Фильтр редиректа с HTTP на HTTPS
+        filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+              statusCode: 301
+        # backendRefs не указываем для правила с редиректом
+
+  # HTTPRoute для основного HTTPS трафика
+  - name: podinfo-https
+    # Привязка к HTTPS listener Gateway
+    parentRefs:
+      - name: gwin-gateway
+        namespace: gwin-system
+        sectionName: https
+    # Hostnames для маршрутизации трафика
+    # Значение передается через helm --set при деплое
+    # Пример: --set httpRoutes[1].hostnames[0]=podinfo.example.com
+    hostnames:
+      - podinfo.YOUR_DNS_ZONE
+    # Правило для маршрутизации на backend
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        # Backend references - явно указываем namespace, так как HTTPRoute в demo namespace
+        # и service тоже в demo namespace
+        backendRefs:
+          - name: podinfo
+            namespace: demo
+            port: 9898
+            weight: 1

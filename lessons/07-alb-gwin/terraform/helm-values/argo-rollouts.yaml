@@ -1,0 +1,35 @@
+# Установка и обновление CRDs
+installCRDs: true
+
+# Установка в кластерном режиме (требует ClusterRole)
+clusterInstall: true
+
+# Создание aggregate roles для RBAC
+createClusterAggregateRoles: true
+
+# Установка плагина Gateway API для Argo Rollouts
+# Документация: https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/installation/
+controller:
+  # Init container для копирования плагина Gateway API
+  initContainers:
+    - name: copy-gwapi-plugin
+      image: ghcr.io/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi:v0.5.0
+      command: ["/bin/sh", "-c"]
+      args:
+        - cp /bin/rollouts-plugin-trafficrouter-gatewayapi /plugins
+      volumeMounts:
+        - name: gwapi-plugin
+          mountPath: /plugins
+  # Регистрация плагина Gateway API
+  trafficRouterPlugins:
+    - name: argoproj-labs/gatewayAPI
+      location: "file:///plugins/rollouts-plugin-trafficrouter-gatewayapi"
+  # Volumes для плагина
+  volumes:
+    - name: gwapi-plugin
+      emptyDir: {}
+  # Volume mounts для плагина
+  volumeMounts:
+    - name: gwapi-plugin
+      mountPath: /plugins
+

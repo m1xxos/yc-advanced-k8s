@@ -1,0 +1,144 @@
+# Конфигурация для чарта podinfo-rollout с Canary strategy, Canary версия, Плохая версия
+# Имя rollout и service без префикса release name
+# fullnameOverride: podinfo
+
+# Namespace задается через параметр --namespace при helm install/upgrade
+# namespaceOverride не используется
+
+# Количество реплик
+replicaCount: 2
+
+# Уровень логирования
+logLevel: debug
+
+# Настройки UI
+ui:
+  color: "#e74c3c"
+  message: "Lesson 7: ALB Gwin with Rollout v3 (broken version)"
+
+# Fault injection: включен unready
+# unready: true делает /readyz endpoint всегда возвращающим ошибку
+faults:
+  delay: false
+  error: false
+  unhealthy: false
+  unready: true
+  testFail: false
+  testTimeout: false
+
+# Лимиты и запросы ресурсов
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+# Конфигурация Service
+# Для Rollout сервисы создаются автоматически (stable и canary)
+service:
+  type: NodePort
+
+# Конфигурация Argo Rollouts с Canary strategy
+rollout:
+  # Время в секундах для ожидания готовности pod'ов перед автоматическим откатом
+  # Если pod'ы не станут ready в течение этого времени, произойдет автоматический откат
+  progressDeadlineSeconds: 120
+  # Включить автоматический откат при превышении progressDeadlineSeconds
+  progressDeadlineAbort: true
+  strategy:
+    canary:
+      # Настройка автоматического управления трафиком через Gateway API
+      # Документация: https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/
+      trafficRouting:
+        plugins:
+          # Использование плагина Gateway API для автоматического управления весами в HTTPRoute
+          # Плагин должен быть установлен в контроллере Argo Rollouts
+          # Документация по установке: https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/installation/
+          argoproj-labs/gatewayAPI:
+            # Имя HTTPRoute ресурса, который будет автоматически обновляться плагином
+            # Плагин будет изменять веса (weight) в backendRefs HTTPRoute в соответствии с шагами canary развертывания
+            httpRoute: podinfo-https
+            # Namespace, в котором находится HTTPRoute ресурс
+            namespace: demo
+      # Шаги развертывания canary
+      steps:
+        # Шаг 1: Установить вес canary на 20%
+        - setWeight: 20
+        # Шаг 2: Пауза для проверки (автоматическое продвижение через 300 секунд)
+        - pause:
+            duration: 300
+        # Шаг 3: Увеличить вес canary до 40%
+        - setWeight: 40
+        # Шаг 4: Пауза на 240 секунд
+        - pause:
+            duration: 240
+        # Шаг 5: Увеличить вес canary до 60%
+        - setWeight: 60
+        # Шаг 6: Пауза на 240 секунд
+        - pause:
+            duration: 240
+        # Шаг 7: Увеличить вес canary до 80%
+        - setWeight: 80
+        # Шаг 8: Пауза на 240 секунд
+        - pause:
+            duration: 240
+        # Шаг 9: Продвинуть canary на 100% (автоматически)
+        - setWeight: 100
+      # Имя сервиса для canary версии
+      # Этот сервис будет создан автоматически и будет указывать на canary поды
+      canaryService: podinfo-canary
+      # Имя сервиса для stable версии
+      # Этот сервис будет создан автоматически и будет указывать на stable поды
+      stableService: podinfo-stable
+      # Максимальное количество недоступных подов во время обновления
+      maxUnavailable: 1
+      # Максимальное количество дополнительных подов во время обновления
+      maxSurge: 1
+
+# Конфигурация HTTPRoute для Gateway API
+# Список HTTPRoute ресурсов
+httpRoutes:
+  # HTTPRoute для редиректа с HTTP на HTTPS
+  - name: podinfo-redirect
+    parentRefs:
+      - name: gwin-gateway
+        namespace: gwin-system
+        sectionName: http
+    hostnames:
+      - podinfo.YOUR_DNS_ZONE
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+              statusCode: 301
+
+  # HTTPRoute для основного HTTPS трафика
+  - name: podinfo-https
+    parentRefs:
+      - name: gwin-gateway
+        namespace: gwin-system
+        sectionName: https
+    hostnames:
+      - podinfo.YOUR_DNS_ZONE
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        # Backend references - указываем на stable сервис
+        # Во время canary развертывания Rollout автоматически управляет
+        # распределением трафика между stable и canary сервисами
+        backendRefs:
+          - name: podinfo-stable
+            namespace: demo
+            port: 9898
+          - name: podinfo-canary
+            namespace: demo
+            port: 9898
