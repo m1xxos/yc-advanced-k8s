@@ -1,0 +1,12 @@
+# Конфигурация namespaces для Helm chart
+# Переменные передаются через templatefile()
+# Используется цикл для автоматической генерации неймспейсов из local.namespaces
+namespaces:
+  %{~ for key, namespace in namespaces ~}
+  ${namespace.name}:
+    labels:
+      %{~ for label_key, label_value in namespace.labels ~}
+      ${label_key}: ${label_value}
+      %{~ endfor ~}
+  %{~ endfor ~}
+

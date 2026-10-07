@@ -1,0 +1,55 @@
+grafana:
+  name: grafana-${lesson_number}
+  service:
+    type: NodePort
+  config:
+    # Security settings
+    security:
+      admin_user: admin
+      # В данном случае admin пароль устанавливается для удобства
+      # При первом входе в Grafana будет предложено сменить пароль
+      # После смены пароля, пароль будет сохранен в secret grafana-admin-credentials
+      # В следующем модуле расскажем вам про External Secrets Operator и как использовать его для управления секретами в Kubernetes
+      admin_password: "admin"
+  httpRoute:
+    enabled: true
+    gatewayName: ${gwin_gateway_name}
+    gatewayNamespace: ${gwin_controller_namespace_name}
+    hostnames:
+      - "grafana-${lesson_number}.${dns_zone}"
+    # Правила маршрутизации будут созданы автоматически, если не указаны явно
+    # Можно указать кастомные rules, если нужна более сложная конфигурация
+
+# ConfigMaps with Grafana dashboards
+dashboardConfigMaps:
+  enabled: true
+  configMaps:
+    - enabled: true
+      name: k8s-nodes-network-configmap
+      dataBase64:
+        k8s-nodes-network.json: "${k8s_nodes_network_dashboard_json}"
+
+dashboard:
+  enabled: true
+  dashboards:
+  #   - name: k8s-system-coredns
+  #     url: "https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-system-coredns.json"
+  #     contentCacheDuration: "1h"
+  #     resyncPeriod: "1h"
+  #     folder: "General"
+  #   - name: k8s-views-nodes
+  #     url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-nodes.json
+  #     contentCacheDuration: "1h"
+  #     resyncPeriod: "1h"
+  #     folder: "General"
+    - name: k8s-nodes-network
+      folder: "General"
+      resyncPeriod: "5m"
+      configMapRef:
+        name: k8s-nodes-network-configmap
+        key: k8s-nodes-network.json
+  #   - name: k8s-views-pods
+  #     url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-pods.json
+  #     contentCacheDuration: "1h"
+  #     resyncPeriod: "1h"
+  #     folder: "General"

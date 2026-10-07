@@ -1,0 +1,37 @@
+prometheus:
+  enabled: true
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+alertmanager:
+  enabled: false
+grafana:
+  enabled: false
+  defaultDashboardsEnabled: false
+coreDns:
+  enabled: true
+kubeApiServer:
+  enabled: false
+kubelet:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeDns:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeStateMetrics:
+  enabled: true
+nodeExporter:
+  enabled: true
+prometheusOperator:
+  enabled: true
+thanosRuler:
+  enabled: false
+kube-state-metrics:
+  metricLabelsAllowlist:
+    # Add metrics: label_topology_kubernetes_io_zone 
+    - nodes=[topology.kubernetes.io/zone]

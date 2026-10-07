@@ -1,0 +1,53 @@
+# Количество реплик
+replicaCount: 4
+
+# Уровень логирования
+logLevel: debug
+
+# Настройки UI
+ui:
+  message: "Lesson 9: Session Affinity + Topology Aware Routing"
+
+# Отключить fault injection для стабильного тестирования
+faults:
+  delay: false
+  error: false
+  unhealthy: false
+  unready: false
+  testFail: false
+  testTimeout: false
+
+# Лимиты и запросы ресурсов
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+# Конфигурация Topology Spread Constraints для равномерного распределения по зонам
+# ВАЖНО: значение app.kubernetes.io/name в labelSelector должно соответствовать release name Helm
+# В данном случае release name = "podinfo-session", поэтому используется app.kubernetes.io/name: podinfo-session
+# Если release name отличается, измените значение labelSelector соответственно
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: podinfo-session
+
+# Конфигурация Service
+service:
+  # Тип сервиса: ClusterIP для внутреннего трафика
+  type: ClusterIP
+  # Включить sessionAffinity с типом ClientIP
+  sessionAffinity: ClientIP
+  # Настройка таймаута привязки (по умолчанию 10800 секунд, 3 часа)
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  # Включаем Topology Aware Routing
+  annotations:
+    service.kubernetes.io/topology-mode: Auto

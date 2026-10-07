@@ -1,0 +1,104 @@
+replicaCount: 1
+
+# Размещаем Pod только на одной ноде для демонстрации разницы между Cluster и Local
+# Выбираем первую ноду в зоне ru-central1-a (та же нода, что и в Cluster режиме)
+nodeSelector:
+  topology.kubernetes.io/zone: ru-central1-a
+
+service:
+  type: LoadBalancer
+  port: 80
+  externalTrafficPolicy: Local
+
+config:
+  nginxConfig: |
+    server {
+        listen 80;
+        server_name _;
+        
+        root /usr/share/nginx/html;
+        index index.html;
+        
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+        
+        location /ip {
+            default_type application/json;
+            return 200 '{"remote_addr":"$remote_addr","note":"При Local режиме исходный IP клиента сохраняется на уровне сети"}';
+        }
+        
+        location /ping {
+            default_type text/plain;
+            return 200 "pong";
+        }
+    }
+  indexHtml: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Nginx IP Checker</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 50px auto;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .container {
+                background-color: white;
+                padding: 30px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            h1 {
+                color: #333;
+                border-bottom: 2px solid #4CAF50;
+                padding-bottom: 10px;
+            }
+            .info-box {
+                background-color: #e8f5e9;
+                border-left: 4px solid #4CAF50;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 4px;
+            }
+            .info-item {
+                margin: 10px 0;
+                font-size: 16px;
+            }
+            .label {
+                font-weight: bold;
+                color: #555;
+            }
+            .value {
+                color: #2196F3;
+                font-family: monospace;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Nginx IP Checker</h1>
+            
+            <div class="info-box">
+                <div class="info-item">
+                    <span class="label">Client IP (from nginx):</span>
+                    <span class="value" id="client-ip">Loading...</span>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            fetch('/ip')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('client-ip').textContent = data.remote_addr || 'Not available';
+                })
+                .catch(err => {
+                    document.getElementById('client-ip').textContent = 'Error: ' + err.message;
+                });
+        </script>
+    </body>
+    </html>
